@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: live-activity-scheduler
@@ -18,11 +19,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Request signed GitHub identity
+        id: oidc
+        uses: actions/github-script@v8
+        with:
+          script: return await core.getIDToken('herostage-live-activity')
+          result-encoding: string
+
       - name: Wake TestFlight backend and run due Live Activities
         env:
-          CRON_SECRET: ${{ secrets.LIVE_ACTIVITY_CRON_SECRET }}
+          OIDC_TOKEN: ${{ steps.oidc.outputs.result }}
         run: |
-          test -n "$CRON_SECRET"
+          test -n "$OIDC_TOKEN"
           curl \
             --fail \
             --silent \
@@ -33,5 +41,5 @@ jobs:
             --connect-timeout 15 \
             --max-time 120 \
             --request POST \
-            --header "x-cron-secret: $CRON_SECRET" \
+            --header "Authorization: Bearer $OIDC_TOKEN" \
             https://heromode-spidey-testflight.onrender.com/internal/live-activities/tick
