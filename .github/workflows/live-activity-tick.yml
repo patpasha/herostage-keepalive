@@ -5,6 +5,12 @@ on:
     # Offset from the top of the hour to reduce GitHub scheduler congestion.
     - cron: "7,37 * * * *"
   workflow_dispatch:
+    inputs:
+      test_latest:
+        description: Send one diagnostic Live Activity to the latest TestFlight device
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -26,11 +32,16 @@ jobs:
           script: return await core.getIDToken('herostage-live-activity')
           result-encoding: string
 
-      - name: Wake TestFlight backend and run due Live Activities
+      - name: Wake TestFlight backend and run Live Activity task
         env:
           OIDC_TOKEN: ${{ steps.oidc.outputs.result }}
+          TEST_LATEST: ${{ inputs.test_latest }}
         run: |
           test -n "$OIDC_TOKEN"
+          endpoint="tick"
+          if [ "$TEST_LATEST" = "true" ]; then
+            endpoint="test-latest"
+          fi
           curl \
             --fail \
             --silent \
@@ -42,4 +53,4 @@ jobs:
             --max-time 120 \
             --request POST \
             --header "Authorization: Bearer $OIDC_TOKEN" \
-            https://heromode-spidey-testflight.onrender.com/internal/live-activities/tick
+            "https://heromode-spidey-testflight.onrender.com/internal/live-activities/$endpoint"
